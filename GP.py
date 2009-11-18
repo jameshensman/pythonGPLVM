@@ -129,22 +129,20 @@ if __name__=='__main__':
 	Ndata = 50
 	X = np.linspace(-3,3,Ndata).reshape(Ndata,1)
 	Y = np.sin(X) + np.random.standard_normal(X.shape)/20
-	myGP = GP(X,Y,kernels.RBF(1,3))
+	myGP = GP(X,Y)
 	xx = np.linspace(-4,4,200).reshape(200,1)
-	pylab.plot(X,Y,'r.')
 	
-	yy,cc = myGP.predict(xx)
-	pylab.plot(xx,yy,scaley=False)
-	pylab.plot(xx,yy + 2*np.sqrt(cc),'k--',scaley=False)
-	pylab.plot(xx,yy - 2*np.sqrt(cc),'k--',scaley=False)
+	def plot():
+		pylab.figure()
+		pylab.plot(X,Y,'r.')
+		yy,cc = myGP.predict(xx)
+		pylab.plot(xx,yy,scaley=False)
+		pylab.plot(xx,yy + 2*np.sqrt(cc),'k--',scaley=False)
+		pylab.plot(xx,yy - 2*np.sqrt(cc),'k--',scaley=False)
 
+	plot()
 	myGP.find_kernel_params()
-	pylab.figure()
-	yy,cc = myGP.predict(xx)
-	pylab.plot(X,Y,'r.')
-	pylab.plot(xx,yy,scaley=False)
-	pylab.plot(xx,yy + 2*np.sqrt(cc),'k--',scaley=False)
-	pylab.plot(xx,yy - 2*np.sqrt(cc),'k--',scaley=False)
+	plot()
 	
 
 	#print 'alpha',myGP.kernel.alpha
