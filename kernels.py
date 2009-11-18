@@ -5,6 +5,9 @@
 import numpy as np
 
 class RBF:
+	"""Radial Basis Funcion (or 'Squared Exponential') kernel, with the same scale in all directions...
+	k(x_i,x_j) = \alpha \exp \{ -\gamma ||x_1-x_2||^2 \}
+	"""
 	def __init__(self,alpha,gamma):
 		self.alpha = np.exp(alpha)
 		self.gamma = np.exp(gamma)
@@ -61,6 +64,42 @@ class RBF:
 			K[indexn,:] = -2*self.alpha*self.gamma*(x1[indexn,indexd]-x1[:,indexd])*expdiff[indexn,:]
 			K[:,indexn] = K[indexn,:]
 			return K
+
+class RBF_full:
+	def __init__(self,alpha,gammas):
+		self.gammas = np.exp(gammas.flatten())
+		self.dim = gammas.size
+		self.alpha = np.exp(alpha)
+		self.nparams = self.dim+1
+		
+	def set_params(self,params):
+		assert params.size==self.nparams)
+		self.alpha = np.exp(params.flatten()[0])
+		self.gammas = np.exp(params.flatten()[1:])
+		
+	def __call__(self,x1,x2):
+		N1,D1 = x1.shape
+		N2,D2 = x2.shape
+		assert D1==D2, "Vectors must be of matching dimension"
+		assert D1==self.dim, "That data does not match the dimensionality of this kernel"
+		diff = x1.reshape(N1,1,D1)-x2.reshape(1,N2,D2)
+		diff = self.alpha*np.exp(-np.sum(np.square(diff)*self.gammas,-1))
+		return diff
+		
+	def gradients(self,x1):
+		"""Calculate the gradient of the matrix K wrt the (log of the) free parameters"""
+		N1,D1 = x1.shape
+		diff = x1.reshape(N1,1,D1)-x1.reshape(1,N1,D1)
+		sqdiff = np.sum(np.square(diff)*self.gamma,-1)
+		dalpha = self.alpha*np.exp(-sqdiff)
+		dgamma = [-g*np.square(diff[:,:,i])*self.alpha*np.exp(-diff*self.gamma) for i,g in enumerate(self.gammas)]
+		dgamma.insert(0,dalpha)
+		return dgamma
+	
+	def gradients_wrt_data(self,x1):
+		pass
+		
+	
 			
 		
 		

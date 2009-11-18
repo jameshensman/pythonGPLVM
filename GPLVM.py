@@ -35,21 +35,18 @@ class GPLVM:
 		print self.GP.marginal(), 0.5*np.sum(np.square(self.GP.X))
 	
 	def ll(self,xx,i):
+		"""The log likelihood function - used when changing the ith latent variable to xx"""
 		self.GP.X[i] = xx
 		self.GP.update()
-		#return -self.GP.marginal()+ 0.5*np.sum(np.square(self.GP.X))#0.5*np.sum(np.square(s))
 		return -self.GP.marginal()+ 0.5*np.sum(np.square(xx))
 	
 	def ll_grad(self,xx,i):
+		"""the gradient of the likelihood function for us in optimisation"""
 		self.GP.X[i] = xx
 		self.GP.update()
-		Kinv = np.linalg.solve(self.GP.L.T,np.linalg.solve(self.GP.L,np.eye(self.GP.L.shape[0])))
-		
+		self.GP.update_grad()
 		matrix_grads = [self.GP.kernel.gradients_wrt_data(self.GP.X,i,jj) for jj in range(self.GP.Xdim)]
-		
-		alphalphK = np.dot(self.GP.A,self.GP.A.T)-self.GP.Ydim*Kinv
-		grads = [-0.5*np.trace(np.dot(alphalphK,e)) for e in matrix_grads]
-			
+		grads = [-0.5*np.trace(np.dot(self.GP.alphalphK,e)) for e in matrix_grads]
 		return np.array(grads) + xx
 		
 	def optimise_latents(self):
@@ -76,30 +73,29 @@ class GPLVMC(GPLVM):
 		self.GP.X = self.MLP.forward(self.GP.Y)
 		
 	def unpack(self,w):
-		""" TODO: docstring"""
+		""" Unpack the np array into the free variables of the current instance"""
 		assert w.size == self.MLP.nweights + self.GP.kernel.nparams + 1,"bad number of parameters for unpacking"
 		self.MLP.unpack(w[:self.MLP.nweights])
 		self.GP.X = self.MLP.forward(self.GP.Y)
-		self.GP.kernel.set_params(w[self.MLP.nweights:-1])
-		self.GP.beta = np.exp(w[-1])
+		self.GP.set_params(w[self.MLP.nweights:])
+		
 	def pack(self):
-		""" TODO: docstring"""
+		""" 'Pack up' all of the free variables in the model into a np array"""
 		return np.hstack((self.MLP.pack(),self.GP.kernel.get_params(),np.log(self.GP.beta)))
 		
 	def ll(self,w):
 		"""Calculate and return the log likelihood of the model (actually, the log probabiulity of the model). To be used in optimisation routine"""
-		self.MLP.unpack(w[:-3])
-		self.GP.X = self.MLP.forward(self.GP.Y)
-		return  self.GP.ll(w[-3:]) + 0.5*np.sum(np.square(self.GP.X)) -self.MLP.prior()
+		self.unpack(w)
+		self.GP.update()
+		return  -self.GP.marginal() - self.GP.hyper_prior() + 0.5*np.sum(np.square(self.GP.X)) -self.MLP.prior()
 	
 	
 	def ll_grad(self,w):
 		"""The gradient of the ll function - used for quicker optimisation via fmin_cg"""
-		self.MLP.unpack(w[:-3])
-		self.GP.X = self.MLP.forward(self.GP.Y)
+		self.unpack(w)
 		
-		#gradients wrt the GP parameters can be done inside the GP class. This also sets the kernel parameters, computes alphalphK.
-		GP_grads = self.GP.ll_grad(w[-3:])
+		#gradients wrt the GP parameters can be done inside the GP class. This also updates the GP, computes alphalphK.
+		GP_grads = self.GP.ll_grad(w[self.MLP.nweights:])
 		
 		#gradient matrices (gradients of the kernel matrix wrt data)
 		gradient_matrices = self.GP.kernel.gradients_wrt_data(self.GP.X)
@@ -108,18 +104,18 @@ class GPLVMC(GPLVM):
 		x_gradients = np.array([-0.5*np.trace(np.dot(self.GP.alphalphK,e)) for e in gradient_matrices]).reshape(self.GP.X.shape) + self.GP.X
 		
 		#backpropagate...
-		weight_gradients = self.MLP.backpropagate(self.GP.Y,x_gradients) - self.MLP.prior_grad()#+ self.MLP.alpha*w[:-3]
+		weight_gradients = self.MLP.backpropagate(self.GP.Y,x_gradients) - self.MLP.prior_grad()
 		return np.hstack((weight_gradients,GP_grads))
 		
-	def learn(self,callback=None):
+	def learn(self,callback=None,gtol=1e-4):
 		"""'Learn' by optimising the weights of the MLP and the GP hyper parameters together.  """
-		w_opt = optimize.fmin_cg(self.ll,np.hstack((self.MLP.pack(),self.GP.kernel.get_params(),np.log(self.GP.beta))),self.ll_grad,args=(),callback=callback)
+		w_opt = optimize.fmin_cg(self.ll,np.hstack((self.MLP.pack(),self.GP.kernel.get_params(),np.log(self.GP.beta))),self.ll_grad,args=(),callback=callback,gtol=gtol)
 		final_cost = self.ll(w_opt)#sets all the parameters...
 		
 
 
 if __name__=="__main__":
-	N = 50
+	N = 20
 	colours = np.arange(N)#something to colour the dots with...
 	theta = np.linspace(2,6,N)
 	Y = np.vstack((np.sin(theta)*(1+theta),np.cos(theta)*theta)).T
@@ -143,15 +139,16 @@ if __name__=="__main__":
 		pylab.plot(Y_pred[:,0],Y_pred[:,1],'b')
 	
 	class callback:
-		def __init__(self,print_interval,objective_fn):
+		def __init__(self,print_interval):
 			self.counter = 0
 			self.print_interval = print_interval
-			self.objective_fn = objective_fn
 		def __call__(self,w):
 			self.counter +=1
 			if not self.counter%self.print_interval:
-				print self.counter, 'iterations, cost: ',self.objective_fn(w)
-	cb = callback(100,myGPLVM.ll)
+				print self.counter, 'iterations, cost: ',myGPLVM.ll_grad(w)
+				plot_current()
+				
+	cb = callback(100)
 			
 	myGPLVM.learn(callback=cb)
 	plot_current()
