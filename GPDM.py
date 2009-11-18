@@ -59,8 +59,13 @@ class GPDM:
 			X[t,:,:] = X[t,:,:].repeat(index,axis=0)
 		return X
 		
-	def ll(self):
+	def set_GP_params(self,params):
+		"""set the parameters of th two GPs to the passed values"""
+		pass# TODO
+		
+	def ll(self,params):
 		"""M-step objective. Calculate the expected value of -log p(Y|X,\theta) under the distrbution of X"""
+		# TODO: set GP parameters
 		L = 0
 		for n in range(self.particles.shape[1]):
 			self.observation_GP.X = self.particles[:,n,:]
@@ -75,22 +80,25 @@ class GPDM:
 			L += L1+L2
 		return L
 		
-	def ll_grad(self):
+	def ll_grad(self,params):
 		""" Gradient ofr optimisation of the M-step."""
 		G = np.zeros(self.obsertation_GP.kernel.nparams_self.dynamic_GP.kernel.nparams +2)#2 added for the beta values of each GP
 		for n in range(self.particles.shape[1]):
 			self.observation_GP.X = self.particles[:,n,:]
 			self.obsertation_GP.update()
 			self.obsertation_GP.update_grad()
-			L1 = -self.observation_GP.marginal() - self.observation_GP.hyper_prior()
 			
-			self.dynamic_GP.X = self.particles[:,n,:-1]
-			self.dynamic_GP.Y = self.particles[:,n,1:]
-			self.dynamic_GP.update()
-			L2 = -self.dynamic_GP.marginal() - self.dynamic_GP.hyper_prior()
+			# TODO: update GP code to make getting gradients easier
 			
-			L += L1+L2
-		return L
+		return G
+		
+	def learn(self,iters):
+		for i in range(iters):
+			self.filter(self.particles,self.observation_GP.Y)
+			optimize.fmin_cg(self.ll,self.ll_grad,start)
+			
+			
+		
 		
 		
 		
