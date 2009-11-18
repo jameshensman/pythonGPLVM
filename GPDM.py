@@ -22,6 +22,10 @@ class GPDM:
 		X = np.array(myPCA_EM.m_Z)
 		
 		self.observation_GP = GP.GP(X,Y)
+		
+		#create a linear kernel for the dynamics
+		k = kernels.linear(
 		self.dynamic_GP = GP.GP(X[:-1],X[1:])
+		
 		
 		

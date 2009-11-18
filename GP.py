@@ -126,12 +126,15 @@ class GP:
 
 if __name__=='__main__':
 	#generate data:
-	Ndata = 50
+	Ndata = 500
 	X = np.linspace(-3,3,Ndata).reshape(Ndata,1)
 	Y = np.sin(X) + np.random.standard_normal(X.shape)/20
-	myGP = GP(X,Y)
-	xx = np.linspace(-4,4,200).reshape(200,1)
 	
+	#create GP object
+	myGP = GP(X,Y)
+	
+	#stuff for plotting
+	xx = np.linspace(-4,4,200).reshape(200,1)
 	def plot():
 		pylab.figure()
 		pylab.plot(X,Y,'r.')
@@ -144,11 +147,6 @@ if __name__=='__main__':
 	myGP.find_kernel_params()
 	plot()
 	
-
-	#print 'alpha',myGP.kernel.alpha
-	#print 'beta',myGP.beta
-	#print 'gamma',myGP.kernel.gamma
-
 
 	pylab.show()
 
