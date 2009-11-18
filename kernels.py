@@ -91,13 +91,33 @@ class RBF_full:
 		N1,D1 = x1.shape
 		diff = x1.reshape(N1,1,D1)-x1.reshape(1,N1,D1)
 		sqdiff = np.sum(np.square(diff)*self.gamma,-1)
-		dalpha = self.alpha*np.exp(-sqdiff)
-		dgamma = [-g*np.square(diff[:,:,i])*self.alpha*np.exp(-diff*self.gamma) for i,g in enumerate(self.gammas)]
-		dgamma.insert(0,dalpha)
+		expdiff = np.exp(-sqdiff)
+		grads = [-g*np.square(diff[:,:,i])*self.alpha*expdiff for i,g in enumerate(self.gammas)]
+		dgamma.insert(0, self.alpha*np.expdiff))
 		return dgamma
 	
 	def gradients_wrt_data(self,x1):
-		pass
+		"""compute the derivative matrix of the kernel wrt the _data_. Crazy
+		This returns a list of matices: each matrix is NxN, and there are N*D of them!"""
+		N1,D1 = x1.shape
+		diff = x1.reshape(N1,1,D1)-x1.reshape(1,N1,D1)
+		sqdiff = np.sum(np.square(diff)*self.gammas,-1)
+		expdiff = np.exp(-sqdiff)
+		
+		if (indexn==None) and(indexd==None):#calculate all gradients
+			rets = []
+			for n in range(N1):
+				for d in range(D1):
+					K = np.zeros((N1,N1))
+					K[n,:] = -2*self.alpha*self.gammas[d]*(x1[n,d]-x1[:,d])*expdiff[n,:]
+					K[:,n] = K[n,:]
+					rets.append(K.copy())
+			return rets
+		else:
+			K = np.zeros((N1,N1))
+			K[indexn,:] = -2*self.alpha*self.gammas[indexd]*(x1[indexn,indexd]-x1[:,indexd])*expdiff[indexn,:]
+			K[:,indexn] = K[indexn,:]
+			return K.copy()
 		
 	
 			
