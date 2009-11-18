@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# Copyright 2009 James Hensman
+# Licensed under the Gnu General Public license, see COPYING
 import numpy as np
 import pylab
 from scipy.optimize import fmin, fmin_ncg, fmin_cg
@@ -46,26 +48,33 @@ class GP:
 		self.Y -= self.ymean
 		self.Y /= self.ystd
 		
-	def ll(self,params):
-		"""  A cost function to optimise for setting the kernel parameters. """
+	def hyper_prior(self,params):
+		"""return the log of the current hyper paramters under their prior"""
+		return -0.5*np.dot(self.parameter_prior_widths,np.square(params))
+		
+	def set_params(self,params):
+		""" TODO """
+		assert params.size==self.kernel.nparams+1
 		self.beta = np.exp(params[-1])
 		self.kernel.set_params(params[:-1])
+		
+	def ll(self,params):
+		"""  A cost function to optimise for setting the kernel parameters. """
+		self.set_params(params)
 		try:
 			self.update()
 		except:
 			return np.inf
-		return -self.marginal() + 0.5*np.dot(self.parameter_prior_widths,np.square(params))
+		return -self.marginal() - self.hyper_prior()
 		
 	def ll_grad(self,params):
 		""" the gradient of the ll function, for use with conjugate gradient outputs.  """
-		self.beta = np.exp(params[-1])
-		self.kernel.set_params(params[:-1])
+		self.set_params(params)
 		try:
 			self.update()
 		except:
 			return np.ones(params.shape)*np.NaN
-		self.Kinv = np.linalg.solve(self.L.T,np.linalg.solve(self.L,np.eye(self.L.shape[0])))
-		
+		self.update_grad()
 		matrix_grads = [e for e in self.kernel.gradients(self.X)]
 		matrix_grads.append(-np.eye(self.K.shape[0])/self.beta) #noise gradient matrix
 		
@@ -81,11 +90,15 @@ class GP:
 		final_ll = self.ll(new_params) # sets variables - required!
 		
 	def update(self):
-		"""do the Cholesky decomposition as required to make predictions"""
+		"""do the Cholesky decomposition as required to make predictions and calculate the marginal likelihood"""
 		self.K = self.kernel(self.X,self.X) 
 		self.K += np.eye(self.K.shape[0])/self.beta
 		self.L = np.linalg.cholesky(self.K)
 		self.A = linalg.cho_solve((self.L,1),self.Y)
+	
+	def update_grad(self):
+		"""do the matrix manipulation required in order to calculate gradients"""
+		self.Kinv = np.linalg.solve(self.L.T,np.linalg.solve(self.L,np.eye(self.L.shape[0])))
 		
 	def marginal(self):
 		"""The Marginal Likelihood. Useful for optimising Kernel parameters"""

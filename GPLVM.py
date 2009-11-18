@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+# Copyright 2009 James Hensman
+# Licensed under the Gnu General Public license, see COPYING
+
 import numpy as np
 import pylab
 from PCA_EM import PCA_EM
@@ -7,8 +10,9 @@ import GP
 from scipy import optimize
 import MLP
 
+
 class GPLVM:
-	"""TODO: this should inherrit a GP, not contain an instance of it..."""
+	""" TODO: this should inherrit a GP, not contain an instance of it..."""
 	def __init__(self,Y,dim):
 		self.Xdim = dim
 		self.N,self.Ydim = Y.shape
@@ -70,17 +74,27 @@ class GPLVMC(GPLVM):
 		self.MLP = MLP.MLP((self.Ydim,nhidden,self.Xdim),alpha=mlp_alpha)
 		self.MLP.train(self.GP.Y,self.GP.X)#create an MLP initialised to the PCA solution...
 		self.GP.X = self.MLP.forward(self.GP.Y)
-		#bypass the GP class's normalising stuff
-		self.GP.xmean = 0
-		self.GP.xstd = 1
+		
+	def unpack(self,w):
+		""" TODO: docstring"""
+		assert w.size == self.MLP.nweights + self.GP.kernel.nparams + 1,"bad number of parameters for unpacking"
+		self.MLP.unpack(w[:self.MLP.nweights])
+		self.GP.X = self.MLP.forward(self.GP.Y)
+		self.GP.kernel.set_params(w[self.MLP.nweights:-1])
+		self.GP.beta = np.exp(w[-1])
+	def pack(self):
+		""" TODO: docstring"""
+		return np.hstack((self.MLP.pack(),self.GP.kernel.get_params(),np.log(self.GP.beta)))
 		
 	def ll(self,w):
+		"""Calculate and return the log likelihood of the model (actually, the log probabiulity of the model). To be used in optimisation routine"""
 		self.MLP.unpack(w[:-3])
 		self.GP.X = self.MLP.forward(self.GP.Y)
-		return  self.GP.ll(w[-3:]) + 0.5*np.sum(np.square(self.GP.X)) + 0.5*self.MLP.alpha*np.sum(np.square(w[:-3]))#regulariser on mlp weights TODO: move into MLP code
+		return  self.GP.ll(w[-3:]) + 0.5*np.sum(np.square(self.GP.X)) -self.MLP.prior()
 	
 	
 	def ll_grad(self,w):
+		"""The gradient of the ll function - used for quicker optimisation via fmin_cg"""
 		self.MLP.unpack(w[:-3])
 		self.GP.X = self.MLP.forward(self.GP.Y)
 		
@@ -89,16 +103,16 @@ class GPLVMC(GPLVM):
 		
 		#gradient matrices (gradients of the kernel matrix wrt data)
 		gradient_matrices = self.GP.kernel.gradients_wrt_data(self.GP.X)
+		
 		#gradients of the error function wrt 'network outputs', i.e. latent variables
 		x_gradients = np.array([-0.5*np.trace(np.dot(self.GP.alphalphK,e)) for e in gradient_matrices]).reshape(self.GP.X.shape) + self.GP.X
 		
-		weight_gradients = self.MLP.backpropagate(self.GP.Y,x_gradients) + self.MLP.alpha*w[:-3]
-		
+		#backpropagate...
+		weight_gradients = self.MLP.backpropagate(self.GP.Y,x_gradients) - self.MLP.prior_grad()#+ self.MLP.alpha*w[:-3]
 		return np.hstack((weight_gradients,GP_grads))
 		
 	def learn(self,callback=None):
 		"""'Learn' by optimising the weights of the MLP and the GP hyper parameters together.  """
-		#w_opt = optimize.fmin(self.ll,np.hstack((self.MLP.pack(),self.GP.kernel.get_params(),np.log(self.GP.beta))),maxiter=miter,maxfun=meval)
 		w_opt = optimize.fmin_cg(self.ll,np.hstack((self.MLP.pack(),self.GP.kernel.get_params(),np.log(self.GP.beta))),self.ll_grad,args=(),callback=callback)
 		final_cost = self.ll(w_opt)#sets all the parameters...
 		
@@ -139,7 +153,6 @@ if __name__=="__main__":
 				print self.counter, 'iterations, cost: ',self.objective_fn(w)
 	cb = callback(100,myGPLVM.ll)
 			
-	#plot_current()
 	myGPLVM.learn(callback=cb)
 	plot_current()
 	
