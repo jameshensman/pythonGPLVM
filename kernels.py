@@ -81,6 +81,11 @@ class linear:
 		prod = self.alpha*np.sum(prod,-1) + self.bias
 		#diff = self.alpha*np.sqrt(np.square(np.sum(diff,-1)))
 		return prod
+	def gradients(self,x1):
+		"""Calculate the gradient of the kernel matrix wrt the parameters"""
+		dalpha = (self(x1,x1)-self.bias)/self.alpha
+		dbias = np.ones((x1,shape[0],x1.shape[0]))
+		return dalpha, dbias
 
 class combined:
 	""" a combined kernel - linear in X and RBF in Y.  

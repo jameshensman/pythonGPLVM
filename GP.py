@@ -48,8 +48,9 @@ class GP:
 		self.Y -= self.ymean
 		self.Y /= self.ystd
 		
-	def hyper_prior(self,params):
+	def hyper_prior(self):
 		"""return the log of the current hyper paramters under their prior"""
+		params = np.hstack((self.kernel.get_params(),np.log(self.beta)))
 		return -0.5*np.dot(self.parameter_prior_widths,np.square(params))
 		
 	def set_params(self,params):
@@ -78,7 +79,6 @@ class GP:
 		matrix_grads = [e for e in self.kernel.gradients(self.X)]
 		matrix_grads.append(-np.eye(self.K.shape[0])/self.beta) #noise gradient matrix
 		
-		self.alphalphK = np.dot(self.A,self.A.T)-self.Ydim*self.Kinv
 		grads = [-0.5*np.trace(np.dot(self.alphalphK,e)) for e in matrix_grads]
 			
 		return np.array(grads) + self.parameter_prior_widths*params
@@ -99,6 +99,7 @@ class GP:
 	def update_grad(self):
 		"""do the matrix manipulation required in order to calculate gradients"""
 		self.Kinv = np.linalg.solve(self.L.T,np.linalg.solve(self.L,np.eye(self.L.shape[0])))
+		self.alphalphK = np.dot(self.A,self.A.T)-self.Ydim*self.Kinv
 		
 	def marginal(self):
 		"""The Marginal Likelihood. Useful for optimising Kernel parameters"""
