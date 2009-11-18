@@ -73,9 +73,12 @@ class RBF_full:
 		self.nparams = self.dim+1
 		
 	def set_params(self,params):
-		assert params.size==self.nparams)
+		assert params.size==self.nparams
 		self.alpha = np.exp(params.flatten()[0])
 		self.gammas = np.exp(params.flatten()[1:])
+	
+	def get_params(self):
+		return np.log(np.hstack((self.alpha,self.gammas)))
 		
 	def __call__(self,x1,x2):
 		N1,D1 = x1.shape
@@ -90,13 +93,13 @@ class RBF_full:
 		"""Calculate the gradient of the matrix K wrt the (log of the) free parameters"""
 		N1,D1 = x1.shape
 		diff = x1.reshape(N1,1,D1)-x1.reshape(1,N1,D1)
-		sqdiff = np.sum(np.square(diff)*self.gamma,-1)
+		sqdiff = np.sum(np.square(diff)*self.gammas,-1)
 		expdiff = np.exp(-sqdiff)
 		grads = [-g*np.square(diff[:,:,i])*self.alpha*expdiff for i,g in enumerate(self.gammas)]
-		dgamma.insert(0, self.alpha*np.expdiff))
-		return dgamma
+		grads.insert(0, self.alpha*expdiff)
+		return grads
 	
-	def gradients_wrt_data(self,x1):
+	def gradients_wrt_data(self,x1,indexn=None,indexd=None):
 		"""compute the derivative matrix of the kernel wrt the _data_. Crazy
 		This returns a list of matices: each matrix is NxN, and there are N*D of them!"""
 		N1,D1 = x1.shape

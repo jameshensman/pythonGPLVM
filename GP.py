@@ -16,7 +16,7 @@ class GP:
 		self.setY(Y)
 		
 		if kernel==None:
-			self.kernel = kernels.RBF(1,5)
+			self.kernel = kernels.RBF_full(-1,-np.ones(self.Xdim))
 		else:
 			self.kernel = kernel
 		if parameter_priors==None:
@@ -66,7 +66,7 @@ class GP:
 			self.update()
 		except:
 			return np.inf
-		return -self.marginal() - self.hyper_prior(params)
+		return -self.marginal() - self.hyper_prior()
 		
 	def ll_grad(self,params):
 		""" the gradient of the ll function, for use with conjugate gradient outputs.  """
