@@ -10,6 +10,7 @@ import kernels
 import GP
 from scipy import optimize
 
+
 class GPDM:
 	""" A Gaussian Process Dynamic Model. Two GPs are used - one for the observation mapping and one for the dynamic mapping.
 	A particle filter is used for inference of the latent variables"""

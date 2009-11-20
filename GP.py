@@ -126,12 +126,12 @@ class GP:
 
 if __name__=='__main__':
 	#generate data:
-	Ndata = 500
+	Ndata = 50
 	X = np.linspace(-3,3,Ndata).reshape(Ndata,1)
 	Y = np.sin(X) + np.random.standard_normal(X.shape)/20
 	
 	#create GP object
-	myGP = GP(X,Y)
+	myGP = GP(X,Y,kernels.linear(-1,-1))
 	
 	#stuff for plotting
 	xx = np.linspace(-4,4,200).reshape(200,1)
