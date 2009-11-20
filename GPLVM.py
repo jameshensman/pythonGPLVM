@@ -81,13 +81,13 @@ class GPLVMC(GPLVM):
 		
 	def pack(self):
 		""" 'Pack up' all of the free variables in the model into a np array"""
-		return np.hstack((self.MLP.pack(),self.GP.kernel.get_params(),np.log(self.GP.beta)))
+		return np.hstack((self.MLP.pack(),self.GP.get_params()))
 		
 	def ll(self,w):
-		"""Calculate and return the log likelihood of the model (actually, the log probabiulity of the model). To be used in optimisation routine"""
+		"""Calculate and return the -ve log likelihood of the model (actually, the log probabiulity of the model). To be used in optimisation routine"""
 		self.unpack(w)
 		self.GP.update()
-		return  -self.GP.marginal() - self.GP.hyper_prior() + 0.5*np.sum(np.square(self.GP.X)) -self.MLP.prior()
+		return  self.GP.ll() + 0.5*np.sum(np.square(self.GP.X)) -self.MLP.prior()
 	
 	
 	def ll_grad(self,w):
@@ -145,7 +145,7 @@ if __name__=="__main__":
 		def __call__(self,w):
 			self.counter +=1
 			if not self.counter%self.print_interval:
-				print self.counter, 'iterations, cost: ',myGPLVM.ll_grad(w)
+				print self.counter, 'iterations, cost: ',myGPLVM.GP.get_params()
 				plot_current()
 				
 	cb = callback(100)

@@ -10,7 +10,9 @@ import kernels
 
 class GP:
 	def __init__(self,X,Y,kernel=None,parameter_priors=None):
-		""" a simple GP with model selection"""
+		""" a simple GP with optimisation of the Hyper parameters via the marginal likelihood approach.  
+		There is a Univariate Gaussian Prior on the Hyper parameters (the kernel parameters and the noise parameter). 
+		SCG is used to optimise the parameters (MAP estimate)"""
 		self.N = Y.shape[0]
 		self.setX(X)
 		self.setY(Y)
@@ -50,27 +52,36 @@ class GP:
 		
 	def hyper_prior(self):
 		"""return the log of the current hyper paramters under their prior"""
-		params = np.hstack((self.kernel.get_params(),np.log(self.beta)))
-		return -0.5*np.dot(self.parameter_prior_widths,np.square(params))
+		return -0.5*np.dot(self.parameter_prior_widths,np.square(self.get_params()))
+	
+	def hyper_prior_grad(self):
+		"""return the gradient of the (log of the) hyper prior for the current parameters"""
+		return -self.parameter_prior_widths*self.get_params()
+		
+	def get_params(self):
+		"""return the parameters of this GP: that is the kernel parameters and the beta value"""
+		return np.hstack((self.kernel.get_params(),np.log(self.beta)))
 		
 	def set_params(self,params):
-		""" TODO """
+		""" set the kernel parameters and the noise parameter beta"""
 		assert params.size==self.kernel.nparams+1
 		self.beta = np.exp(params[-1])
 		self.kernel.set_params(params[:-1])
 		
-	def ll(self,params):
-		"""  A cost function to optimise for setting the kernel parameters. """
-		self.set_params(params)
+	def ll(self,params=None):
+		"""  A cost function to optimise for setting the kernel parameters. Uses current parameter values if none are passed """
+		if not params == None:
+			self.set_params(params)
 		try:
 			self.update()
 		except:
 			return np.inf
 		return -self.marginal() - self.hyper_prior()
 		
-	def ll_grad(self,params):
-		""" the gradient of the ll function, for use with conjugate gradient outputs.  """
-		self.set_params(params)
+	def ll_grad(self,params=None):
+		""" the gradient of the ll function, for use with conjugate gradient optimisation. uses current values of parameters if none are passed """
+		if not params == None:
+			self.set_params(params)
 		try:
 			self.update()
 		except:
@@ -79,9 +90,9 @@ class GP:
 		matrix_grads = [e for e in self.kernel.gradients(self.X)]
 		matrix_grads.append(-np.eye(self.K.shape[0])/self.beta) #noise gradient matrix
 		
-		grads = [-0.5*np.trace(np.dot(self.alphalphK,e)) for e in matrix_grads]
+		grads = [0.5*np.trace(np.dot(self.alphalphK,e)) for e in matrix_grads]
 			
-		return np.array(grads) + self.parameter_prior_widths*params
+		return -np.array(grads) - self.hyper_prior_grad()
 		
 	def find_kernel_params(self,iters=1000):
 		"""Optimise the marginal likelihood. work with the log of beta - fmin works better that way.  """
@@ -131,7 +142,7 @@ if __name__=='__main__':
 	Y = np.sin(X) + np.random.standard_normal(X.shape)/20
 	
 	#create GP object
-	myGP = GP(X,Y,kernels.linear(-1,-1))
+	myGP = GP(X,Y)#,kernels.linear(-1,-1))
 	
 	#stuff for plotting
 	xx = np.linspace(-4,4,200).reshape(200,1)
