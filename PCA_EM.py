@@ -114,10 +114,10 @@ class PCA_EM_missing:
 			self.m_Z[i,:] = linalg.cho_solve((mchol,1),np.dot(W.T,x2.reshape(index.size,1))).T
 			self.S_Z[i,:,:] = minv*self.sigma2
 			
-			#calculate reconstructed X values
-			Xreconstruct = np.dot(self.m_Z,self.W.T)
-			self.X2unmasked[self.imask,self.jmask] = Xreconstruct[self.imask,self.jmask]
-			self.xxTsum = np.sum(np.square(self.X2unmasked))# can;t be pre-calculate in the missing data version :(
+		#calculate reconstructed X values
+		Xreconstruct = np.dot(self.m_Z,self.W.T)
+		self.X2unmasked[self.imask,self.jmask] = Xreconstruct[self.imask,self.jmask]
+		self.xxTsum = np.sum(np.square(self.X2unmasked))# can;t be pre-calculate in the missing data version :(
 		
 		#M = np.dot(self.W.T,self.W) + np.eye(self.q)*self.sigma2
 		#M_chol = linalg.cholesky(M)
