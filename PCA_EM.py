@@ -119,12 +119,6 @@ class PCA_EM_missing:
 		self.X2unmasked[self.imask,self.jmask] = Xreconstruct[self.imask,self.jmask]
 		self.xxTsum = np.sum(np.square(self.X2unmasked))# can;t be pre-calculate in the missing data version :(
 		
-		#M = np.dot(self.W.T,self.W) + np.eye(self.q)*self.sigma2
-		#M_chol = linalg.cholesky(M)
-		#M_inv = linalg.cho_solve((M_chol,1),np.eye(self.q))
-		#self.m_Z = linalg.cho_solve((M_chol,1),np.dot(self.W.T,self.X2.T)).T
-		#self.S_z = M_inv*self.sigma2
-		
 	def M_step(self):
 		""" This should handle missing data - needs testing (TODO)"""
 		zzT = np.dot(self.m_Z.T,self.m_Z) + np.sum(self.S_Z,0)
@@ -136,20 +130,22 @@ class PCA_EM_missing:
 		self.sigma2 /= self.N*self.d
 
 if __name__=='__main__':
-	q=2#latent dimensions
+	q=5#latent dimensions
 	d=15# observed dimensions
 	N=500
-	Nmissing = 490
+	missing_pc = 50 # percentage of the data points to be 'missing'
 	truesigma = .02
-	niters = 300
+	niters = 30
 	phases = np.random.rand(1,q)*2*np.pi
-	latents = np.sin(np.linspace(0,12,N).reshape(N,1)*np.ones((1,q))-phases)
+	frequencies = np.random.randn(1,q)*2
+	latents = np.sin(np.linspace(0,12,N).reshape(N,1)*frequencies-phases)
 	trueW = np.random.randn(d,q)
 	observed = np.dot(latents,trueW.T) + np.random.randn(N,d)*truesigma
 	a = PCA_EM(observed,q)
 	a.learn(niters)
 	
 	#a missing data problem
+	Nmissing = int(N*missing_pc/100)
 	observed2 = observed.copy()
 	missingi = np.argsort(np.random.rand(N))[:Nmissing]
 	missingj = np.random.randint(0,d-q,Nmissing)#last q columns will be complete
@@ -187,10 +183,6 @@ if __name__=='__main__':
 	pylab.subplot(2,1,2)
 	pylab.plot(observed2,linewidth=2,marker='.')
 	pylab.plot(b.X2unmasked + b.mu.T)
-	#pylab.subplot(2,1,1)
-	#pylab.plot(observed,marker='.')
-	#pylab.subplot(2,1,2)
-	#pylab.plot(observed2,'.')
 
 	pylab.show()
 
