@@ -88,21 +88,32 @@ class PCA_EM_missing:
 		#initialise paramters:
 		self.W = np.random.randn(self.d,self.q)
 		self.sigma2 = 1.2
+		#pre-allocate sel.m_Z and self.S_Z 
+		self.m_Z = np.zeros(self.X2.shape[0],self.q)
+		self.S_Z = np.zeros(self.X2.shape[0],self.q,self.q)
 		for i in range(niters):
 			#print self.sigma2
 			self.E_step()
 			self.M_step()
 
 	def E_step(self):
-		""" TODO: this should handle missing data"""
-		M = np.dot(self.W.T,self.W) + np.eye(self.q)*self.sigma2
-		#M_inv = np.linalg.inv(M)
-		#self.m_Z = np.dot(M_inv,np.dot(self.W.T,self.X2.T)).T
+		""" This should handle missing data, but needs testing (TODO)"""
+		Ms = np.zeros(self.X2.shape[0],self.q,self.q) #M is going to be different for (potentially) every data point
+		for m,x,i in zip(Ms,self.X2masked,np.arange(self.X2.shape[0]):
+			index = np.nonzero(x.mask-1)[0]#select non masked parts
+			W = self.W.take(index,0)# get relevant bits of W
+			x2 = x.take(index) # get relevant bits of x
+			m[:,:] = np.dot(W.T,W) + np.eye(self.q)*self.sigma2
+			mchol = linalg.cholesky(m)
+			minv = linalg.cho_solve((mchol,1),np.eye(self.q))
+			self.m_Z[i,:] = linalg.cho_solve((mchol,1),np.dot(W.T,x2.reshape(index.size,1))).T
+			self.S_Z[i,:,:] = minv*self.sigma2
+			
+		#M = np.dot(self.W.T,self.W) + np.eye(self.q)*self.sigma2
+		#M_chol = linalg.cholesky(M)
+		#M_inv = linalg.cho_solve((M_chol,1),np.eye(self.q))
+		#self.m_Z = linalg.cho_solve((M_chol,1),np.dot(self.W.T,self.X2.T)).T
 		#self.S_z = M_inv*self.sigma2
-		M_chol = linalg.cholesky(M)
-		M_inv = linalg.cho_solve((M_chol,1),np.eye(self.q))
-		self.m_Z = linalg.cho_solve((M_chol,1),np.dot(self.W.T,self.X2.T)).T
-		self.S_z = M_inv*self.sigma2
 		
 	def M_step(self):
 		""" TODO: this should handle missing data"""
