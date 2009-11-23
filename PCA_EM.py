@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 # Copyright 2009 James Hensman
 # Licensed under the Gnu General Public license, see COPYING
-from numpy import matlib as ml
+#from numpy import matlib as ml
 import numpy as np
+from scipy import linalg
 
 class PCA_EM_matrix:
 	def __init__(self,data,target_dim):
@@ -56,9 +57,14 @@ class PCA_EM:
 
 	def E_step(self):
 		M = np.dot(self.W.T,self.W) + np.eye(self.q)*self.sigma2
-		M_inv = np.linalg.inv(M)
-		self.m_Z = np.dot(M_inv,np.dot(self.W.T,self.X2.T)).T
+		#M_inv = np.linalg.inv(M)
+		#self.m_Z = np.dot(M_inv,np.dot(self.W.T,self.X2.T)).T
+		#self.S_z = M_inv*self.sigma2
+		M_chol = linalg.cholesky(M)
+		M_inv = linalg.cho_solve((M_chol,1),np.eye(self.q))
+		self.m_Z = linalg.cho_solve((M_chol,1),np.dot(self.W.T,self.X2.T)).T
 		self.S_z = M_inv*self.sigma2
+		
 	def M_step(self):
 		zzT = np.dot(self.m_Z.T,self.m_Z) + self.N*self.S_z
 		self.W = np.dot(np.dot(self.X2.T,self.m_Z),np.linalg.inv(zzT))
@@ -74,20 +80,20 @@ if __name__=='__main__':
 	d=50
 	N=500
 	truesigma = 4.
-	latents = ml.randn(N,q)
-	trueW = ml.randn(d,q)
-	observed = latents*trueW.T + ml.randn(N,d)*truesigma
+	latents = np.random.randn(N,q)
+	trueW = np.random.randn(d,q)
+	observed = np.dot(latents,trueW.T) + np.random.randn(N,d)*truesigma
 	a = PCA_EM(observed,q)
 	a.learn(500)
 	from hinton import hinton
 	import pylab
-	hinton(ml.linalg.qr(trueW.T)[1].T)
+	hinton(linalg.qr(trueW.T)[1].T)
 	pylab.figure()
-	hinton(ml.linalg.qr(a.W.T)[1].T)
+	hinton(linalg.qr(a.W.T)[1].T)
 	pylab.figure()
-	pylab.scatter(ml.asarray(latents)[:,0],ml.asarray(latents)[:,1],40,ml.asarray(latents)[:,0])
+	pylab.scatter(latents[:,0],latents[:,1],40,latents[:,0])
 	pylab.figure()
-	pylab.scatter(ml.asarray(a.m_Z)[:,0],ml.asarray(a.m_Z)[:,1],40,ml.asarray(latents)[:,0])
+	pylab.scatter(a.m_Z[:,0],a.m_Z[:,1],40,latents[:,0])
 
 	#pylab.show()
 
