@@ -83,12 +83,16 @@ class PCA_EM_missing:
 		self.q = target_dim
 	def learn(self,niters):
 		self.mu = np.asarray(self.Xmasked.mean(0)).reshape(self.d,1)#ML solution for mu
+		#use a masked array to decide which data we're learning from.
 		self.X2masked = self.Xmasked - self.mu.T
-		self.xxTsum = np.sum(np.square(X2masked))#precalculate for speed
+		#make an unmasked copy of X (to be filled with the reconstructed values)
+		self.X2unmasked = np.array(self.Xmasked).copy()
+		self.imask,self.jmask = np.nonzeo(np.isnan(self.X2unmasked)
+		self.X2unmasked[self.imask,self.jmask] = 0
 		#initialise paramters:
 		self.W = np.random.randn(self.d,self.q)
 		self.sigma2 = 1.2
-		#pre-allocate sel.m_Z and self.S_Z 
+		#pre-allocate self.m_Z and self.S_Z 
 		self.m_Z = np.zeros(self.X2.shape[0],self.q)
 		self.S_Z = np.zeros(self.X2.shape[0],self.q,self.q)
 		for i in range(niters):
@@ -109,6 +113,11 @@ class PCA_EM_missing:
 			self.m_Z[i,:] = linalg.cho_solve((mchol,1),np.dot(W.T,x2.reshape(index.size,1))).T
 			self.S_Z[i,:,:] = minv*self.sigma2
 			
+			#calculate reconstructed X values
+			Xreconstruct = np.dot(self.m_Z,self.W.T)
+			self.X2unmasked[self.imask,self.jmask] = Xreconstruct[self.imask,self.jmask]
+			self.xxTsum = np.sum(np.square(self.X2unmasked))# can;t be pre-calculate in the missing data version :(
+		
 		#M = np.dot(self.W.T,self.W) + np.eye(self.q)*self.sigma2
 		#M_chol = linalg.cholesky(M)
 		#M_inv = linalg.cho_solve((M_chol,1),np.eye(self.q))
@@ -116,25 +125,29 @@ class PCA_EM_missing:
 		#self.S_z = M_inv*self.sigma2
 		
 	def M_step(self):
-		""" TODO: this should handle missing data"""
-		zzT = np.dot(self.m_Z.T,self.m_Z) + self.N*self.S_z
+		""" This should handle missing data - needs testing (TODO)"""
+		zzT = np.dot(self.m_Z.T,self.m_Z) + np.sum(self.S_z,0)
 		#self.W = np.dot(np.dot(self.X2.T,self.m_Z),np.linalg.inv(zzT))
 		zzT_chol = linalg.cholesky(zzT)
-		self.W = linalg.cho_solve((zzT_chol,0),np.dot(self.m_Z.T,self.X2)).T
+		self.W = linalg.cho_solve((zzT_chol,0),np.dot(self.m_Z.T,self.X2unmasked)).T
 		WTW = np.dot(self.W.T,self.W)
-		self.sigma2 = self.xxTsum - 2*np.sum(np.dot(self.m_Z,self.W.T)*self.X2) + np.trace(np.dot(zzT,WTW))
+		self.sigma2 = self.xxTsum - 2*np.sum(np.dot(self.m_Z,self.W.T)*self.X2unmasked) + np.trace(np.dot(zzT,WTW))
 		self.sigma2 /= self.N*self.d
 
 if __name__=='__main__':
 	q=2
-	d=50
-	N=5000
+	d=5
+	N=500
 	truesigma = 1.
 	latents = np.random.randn(N,q)
 	trueW = np.random.randn(d,q)
 	observed = np.dot(latents,trueW.T) + np.random.randn(N,d)*truesigma
 	a = PCA_EM(observed,q)
 	a.learn(500)
+	
+	#a missing data problem
+	observed2 = observed.copy()
+	observed
 	from hinton import hinton
 	import pylab
 	hinton(linalg.qr(trueW.T)[1].T)
