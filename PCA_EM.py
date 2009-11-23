@@ -78,35 +78,36 @@ class PCA_EM_missing:
 	def __init__(self,data,target_dim):
 		"""Maximum likelihood PCA by the EM algorithm, allows for missing data.  uses a masked array to 'hide' the elements of X that are NaN"""
 		self.X = np.array(data)
-		self.Xmasked = np.ma.masked_array(X,np.ma.make_mask(np.isnan(self.X)))
+		self.Xmasked = np.ma.masked_array(data,np.ma.make_mask(np.isnan(self.X)))
 		self.N,self.d = self.X.shape
 		self.q = target_dim
+		
 	def learn(self,niters):
 		self.mu = np.asarray(self.Xmasked.mean(0)).reshape(self.d,1)#ML solution for mu
 		#use a masked array to decide which data we're learning from.
 		self.X2masked = self.Xmasked - self.mu.T
 		#make an unmasked copy of X (to be filled with the reconstructed values)
 		self.X2unmasked = np.array(self.Xmasked).copy()
-		self.imask,self.jmask = np.nonzeo(np.isnan(self.X2unmasked)
+		self.imask,self.jmask = np.nonzero(np.isnan(self.X2unmasked))
 		self.X2unmasked[self.imask,self.jmask] = 0
 		#initialise paramters:
 		self.W = np.random.randn(self.d,self.q)
 		self.sigma2 = 1.2
 		#pre-allocate self.m_Z and self.S_Z 
-		self.m_Z = np.zeros(self.X2.shape[0],self.q)
-		self.S_Z = np.zeros(self.X2.shape[0],self.q,self.q)
+		self.m_Z = np.zeros((self.X2masked.shape[0],self.q))
+		self.S_Z = np.zeros((self.X2masked.shape[0],self.q,self.q))
 		for i in range(niters):
-			#print self.sigma2
+			print i,self.sigma2
 			self.E_step()
 			self.M_step()
 
 	def E_step(self):
 		""" This should handle missing data, but needs testing (TODO)"""
-		Ms = np.zeros(self.X2.shape[0],self.q,self.q) #M is going to be different for (potentially) every data point
-		for m,x,i in zip(Ms,self.X2masked,np.arange(self.X2.shape[0]):
+		Ms = np.zeros((self.X2masked.shape[0],self.q,self.q)) #M is going to be different for (potentially) every data point
+		for m,x,i in zip(Ms,self.X2masked,np.arange(self.X2masked.shape[0])):
 			index = np.nonzero(x.mask-1)[0]#select non masked parts
 			W = self.W.take(index,0)# get relevant bits of W
-			x2 = x.take(index) # get relevant bits of x
+			x2 = np.array(x).take(index) # get relevant bits of x
 			m[:,:] = np.dot(W.T,W) + np.eye(self.q)*self.sigma2
 			mchol = linalg.cholesky(m)
 			minv = linalg.cho_solve((mchol,1),np.eye(self.q))
@@ -126,7 +127,7 @@ class PCA_EM_missing:
 		
 	def M_step(self):
 		""" This should handle missing data - needs testing (TODO)"""
-		zzT = np.dot(self.m_Z.T,self.m_Z) + np.sum(self.S_z,0)
+		zzT = np.dot(self.m_Z.T,self.m_Z) + np.sum(self.S_Z,0)
 		#self.W = np.dot(np.dot(self.X2.T,self.m_Z),np.linalg.inv(zzT))
 		zzT_chol = linalg.cholesky(zzT)
 		self.W = linalg.cho_solve((zzT_chol,0),np.dot(self.m_Z.T,self.X2unmasked)).T
@@ -135,28 +136,61 @@ class PCA_EM_missing:
 		self.sigma2 /= self.N*self.d
 
 if __name__=='__main__':
-	q=2
-	d=5
+	q=2#latent dimensions
+	d=15# observed dimensions
 	N=500
-	truesigma = 1.
-	latents = np.random.randn(N,q)
+	Nmissing = 490
+	truesigma = .02
+	niters = 300
+	phases = np.random.rand(1,q)*2*np.pi
+	latents = np.sin(np.linspace(0,12,N).reshape(N,1)*np.ones((1,q))-phases)
 	trueW = np.random.randn(d,q)
 	observed = np.dot(latents,trueW.T) + np.random.randn(N,d)*truesigma
 	a = PCA_EM(observed,q)
-	a.learn(500)
+	a.learn(niters)
 	
 	#a missing data problem
 	observed2 = observed.copy()
-	observed
+	missingi = np.argsort(np.random.rand(N))[:Nmissing]
+	missingj = np.random.randint(0,d-q,Nmissing)#last q columns will be complete
+	observed2[missingi,missingj] = np.NaN
+	
+	b = PCA_EM_missing(observed2,q)
+	b.learn(niters)
+	
+	
 	from hinton import hinton
 	import pylab
+	colours = np.arange(N)# to colour the dots with
 	hinton(linalg.qr(trueW.T)[1].T)
+	pylab.title('true transformation')
 	pylab.figure()
 	hinton(linalg.qr(a.W.T)[1].T)
+	pylab.title('reconstructed transformation')
 	pylab.figure()
-	pylab.scatter(latents[:,0],latents[:,1],40,latents[:,0])
+	hinton(linalg.qr(b.W.T)[1].T)
+	pylab.title('reconstructed transformation (missing data)')
 	pylab.figure()
-	pylab.scatter(a.m_Z[:,0],a.m_Z[:,1],40,latents[:,0])
+	pylab.subplot(3,1,1)
+	pylab.plot(latents)
+	pylab.title('true latents')
+	pylab.subplot(3,1,2)
+	pylab.plot(a.m_Z)
+	pylab.title('reconstructed latents')
+	pylab.subplot(3,1,3)
+	pylab.plot(b.m_Z)
+	pylab.title('reconstructed latents (missing data)')
+	pylab.figure()
+	pylab.subplot(2,1,1)
+	pylab.plot(observed)
+	pylab.title('Observed values')
+	pylab.subplot(2,1,2)
+	pylab.plot(observed2,linewidth=2,marker='.')
+	pylab.plot(b.X2unmasked + b.mu.T)
+	#pylab.subplot(2,1,1)
+	#pylab.plot(observed,marker='.')
+	#pylab.subplot(2,1,2)
+	#pylab.plot(observed2,'.')
 
 	pylab.show()
 
