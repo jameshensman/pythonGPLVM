@@ -67,7 +67,9 @@ class PCA_EM:
 		
 	def M_step(self):
 		zzT = np.dot(self.m_Z.T,self.m_Z) + self.N*self.S_z
-		self.W = np.dot(np.dot(self.X2.T,self.m_Z),np.linalg.inv(zzT))
+		#self.W = np.dot(np.dot(self.X2.T,self.m_Z),np.linalg.inv(zzT))
+		zzT_chol = linalg.cholesky(zzT)
+		self.W = linalg.cho_solve((zzT_chol,0),np.dot(self.m_Z.T,self.X2)).T
 		WTW = np.dot(self.W.T,self.W)
 		self.sigma2 = self.xxTsum - 2*np.sum(np.dot(self.m_Z,self.W.T)*self.X2) + np.trace(np.dot(zzT,WTW))
 		#self.sigma2 = self.xxTsum - 2*ml.trace(self.m_Z*self.W.T*self.X2.T) + ml.trace(zzT*WTW)
@@ -78,8 +80,8 @@ class PCA_EM:
 if __name__=='__main__':
 	q=2
 	d=50
-	N=500
-	truesigma = 4.
+	N=5000
+	truesigma = 1.
 	latents = np.random.randn(N,q)
 	trueW = np.random.randn(d,q)
 	observed = np.dot(latents,trueW.T) + np.random.randn(N,d)*truesigma
@@ -95,5 +97,5 @@ if __name__=='__main__':
 	pylab.figure()
 	pylab.scatter(a.m_Z[:,0],a.m_Z[:,1],40,latents[:,0])
 
-	#pylab.show()
+	pylab.show()
 
